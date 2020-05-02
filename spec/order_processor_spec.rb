@@ -4,12 +4,15 @@ RSpec.describe Bakery::OrderProcessor do
   let!(:scroll_code) { 'VS5' }
   let!(:muffin_code) { 'MB11' }
   let!(:croissant_code) { 'CF' }
+  let!(:by_quantity_and_code) do
+    ->(product, quantity, code) { product.quantity == quantity && product.code == code }
+  end
 
   it 'works for 10 VS5' do
     order = Bakery::Order.new(code: scroll_code, quantity: 10)
     ordered_products = Bakery::OrderProcessor.new(products: products, order: order).run
 
-    expect(ordered_products.select { |p| p.quantity == 5 && p.code == scroll_code }.size).to eq(2)
+    expect(ordered_products.select { |p| by_quantity_and_code.call(p, 5, scroll_code) }.size).to eq(2)
   end
 
   it 'works for 14 MB11' do
@@ -137,16 +140,32 @@ RSpec.describe Bakery::OrderProcessor do
     expect(ordered_products.select { |p| p.quantity == 3 && p.code == croissant_code }.size).to eq(1)
   end
 
+  it 'works for 33 MB11' do
+    order = Bakery::Order.new(code: muffin_code, quantity: 33)
+    ordered_products = Bakery::OrderProcessor.new(products: products, order: order).run
+    expect(ordered_products.select { |p| by_quantity_and_code.call(p, 8, muffin_code) }.size).to eq(3)
+    expect(ordered_products.select { |p| by_quantity_and_code.call(p, 5, muffin_code) }.size).to eq(1)
+    expect(ordered_products.select { |p| by_quantity_and_code.call(p, 2, muffin_code) }.size).to eq(2)
+  end
+
+  it 'works for 1321 MB11' do
+    order = Bakery::Order.new(code: muffin_code, quantity: 1321)
+    ordered_products = Bakery::OrderProcessor.new(products: products, order: order).run
+    expect(ordered_products.select { |p| by_quantity_and_code.call(p, 8, muffin_code) }.size).to eq(164)
+    expect(ordered_products.select { |p| by_quantity_and_code.call(p, 5, muffin_code) }.size).to eq(1)
+    expect(ordered_products.select { |p| by_quantity_and_code.call(p, 2, muffin_code) }.size).to eq(2)
+  end
+
   it 'raises exception if an invalid Order is passed' do
-    expect {
+    expect do
       Bakery::OrderProcessor.new(products: products, order: nil)
-    }.to raise_exception(Bakery::OrderProcessor::InvalidOrder)
+    end.to raise_exception(Bakery::OrderProcessor::InvalidOrder)
   end
 
   it 'raises exception if invalid Products are passed' do
     order = Bakery::Order.new(code: croissant_code, quantity: 1)
-    expect {
+    expect do
       Bakery::OrderProcessor.new(products: 'products', order: order)
-    }.to raise_exception(Bakery::OrderProcessor::InvalidProduct)
+    end.to raise_exception(Bakery::OrderProcessor::InvalidProduct)
   end
 end
